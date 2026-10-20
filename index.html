@@ -28,6 +28,9 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-ap
 import{getFirestore,collection,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyBcns1OW82iioMRzdbBPJ2dOmNyRhVhgcQ",authDomain:"bamssa-fantasy-league.firebaseapp.com",projectId:"bamssa-fantasy-league",storageBucket:"bamssa-fantasy-league.firebasestorage.app",messagingSenderId:"644555872989",appId:"1:644555872989:web:be16b65ca48132983a5934"};
 const ADMIN_PIN="2007";
+const DEADLINE=new Date("2026-11-12T23:59:59+01:00").getTime();
+const locked=()=>Date.now()>DEADLINE;
+function left(){let m=Math.floor((DEADLINE-Date.now())/60000),d=Math.floor(m/1440),h=Math.floor(m%1440/60);return d+"d "+h+"h left"}
 const DEPTS=["Pharmacology","Physiology","MLS","Forensics","Anatomy","Nursing","Biochemistry"];
 const POS=["GK","DEF","MID","FWD"];
 let db,uid,players=[],mgrs=[],me=null,tab="team",admin=false,flt="All",ready=false;
@@ -45,14 +48,14 @@ async function init(){
   onSnapshot(collection(db,"managers"),s=>{mgrs=s.docs.map(d=>({id:d.id,...d.data()}));me=mgrs.find(m=>m.id===uid)||null;ready=true;render()},er);
 }
 async function save(patch){try{await setDoc(doc(db,"managers",uid),{...(me||{}),...patch})}catch(e){alert("Could not save, try again.")}}
-function join(){const n=$("#nm").value.trim(),d=$("#dp").value;if(!n)return alert("Enter your team name");save({name:n,dept:d,squad:[],cap:null})}
-function toggle(id){const sq=[...(me.squad||[])];const i=sq.indexOf(id);
+function join(){if(locked())return alert("Squad selection has ended");const n=$("#nm").value.trim(),d=$("#dp").value;if(!n)return alert("Enter your team name");save({name:n,dept:d,squad:[],cap:null})}
+function toggle(id){if(locked())return alert("Squad selection has ended");const sq=[...(me.squad||[])];const i=sq.indexOf(id);
   if(i>=0){sq.splice(i,1);return save({squad:sq,cap:me.cap===id?null:me.cap})}
   const p=P(id);if(sq.length>=7)return alert("Squad full (7 players)");
   if(cost(me)+p.price>100)return alert("Over budget!");
   if(sq.filter(x=>P(x)&&P(x).dept===p.dept).length>=2)return alert("Max 2 players per department");
   sq.push(id);save({squad:sq})}
-function cap(id){save({cap:id})}
+function cap(id){if(locked())return alert("Squad selection has ended");save({cap:id})}
 function pin(){if($("#pn").value===ADMIN_PIN){admin=true;render()}else alert("Wrong PIN")}
 async function addP(){const n=$("#an").value.trim(),pr=parseFloat($("#ap").value);if(!n||!(pr>0))return alert("Fill name and price");
   await addDoc(collection(db,"players"),{name:n,dept:$("#ad").value,pos:$("#apos").value,price:pr,pts:0});$("#an").value=""}
@@ -63,6 +66,7 @@ function render(){
   const a=$("#app");if(!db||!ready)return;
   const tb=[["team","My Team"],["players","Players"],["table","Table"],["admin","Admin"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("");
   let h=`<div class="tabs">${tb}</div>`;
+  h+=locked()?'<div class="card">🔒 Squad selection has closed</div>':`<div class="card">⏳ Squad selection closes 12 Nov 2026 · ${left()}</div>`;
   if(tab==="team"){
     if(!me)h+=`<div class="card"><b>Create your team</b><input id="nm" placeholder="Team name" maxlength="24"><select id="dp">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><button class="btn p" onclick="join()">Join league</button></div>`;
     else{h+=`<div class="card row"><div><b>${esc(me.name)}</b><div class="mu">${esc(me.dept)} · £${(100-cost(me)).toFixed(1)}m left · ${(me.squad||[]).length}/7</div></div><div class="pts" style="font-size:22px">${score(me)}</div></div>`;
@@ -88,3 +92,4 @@ function setTab(k){tab=k;render()}function setFlt(v){flt=v;render()}
 Object.assign(window,{join,toggle,cap,pin,addP,addPts,delP,setTab,setFlt});
 init();
 </script></body></html>
+
