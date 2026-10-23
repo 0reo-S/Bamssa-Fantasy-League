@@ -68,8 +68,8 @@ function starters(m){return (m.squad||[]).filter(id=>!(m.bench||[]).includes(id)
 function ok(m){const s=starters(m),c=k=>s.filter(p=>p.pos===k).length,[d,mi,f]=FM(m);return (m.squad||[]).length===15&&s.length===11&&c("GK")===1&&c("DEF")===d&&c("MID")===mi&&c("FWD")===f}
 function score(m){return ok(m)?starters(m).reduce((t,p)=>t+pp(p)*(m.cap===p.id?2:1),0):0}
 function cost(m){return (m.squad||[]).reduce((t,id)=>t+(P(id)?P(id).price:0),0)}
-function arrange(form,m){const[d,mi,f]=form.split("-").map(Number),need={GK:1,DEF:d,MID:mi,FWD:f},st=[],bn=[];
-  (m.squad||[]).map(P).filter(Boolean).sort((a,b)=>b.price-a.price).forEach(p=>{if(need[p.pos]>0){need[p.pos]--;st.push(p.id)}else bn.push(p.id)});
+function arrange(form,m){const[d,mi,f]=form.split("-").map(Number),need={GK:1,DEF:d,MID:mi,FWD:f},st=[],bn=[],b0=m.bench||[];
+  (m.squad||[]).map(P).filter(Boolean).sort((a,b)=>(b0.includes(a.id)-b0.includes(b.id))||b.price-a.price).forEach(p=>{if(need[p.pos]>0){need[p.pos]--;st.push(p.id)}else bn.push(p.id)});
   return{bench:bn,cap:st.includes(m.cap)?m.cap:null}}
 const bl=()=>{const f=document.activeElement;f&&f.blur&&f.blur()};
 const resizeImg=f=>new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=e=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=160,c=document.createElement("canvas");c.width=c.height=s;const m=Math.min(im.width,im.height);c.getContext("2d").drawImage(im,(im.width-m)/2,(im.height-m)*0.2,m,m,0,0,s,s);res(c.toDataURL("image/jpeg",0.75))};im.src=e.target.result};r.readAsDataURL(f)});
@@ -102,9 +102,14 @@ function toggle(id){if(locked())return alert(END);const sq=[...(me.squad||[])],b
   if(ps.filter(x=>x.dept===p.dept).length>=MAXD)return alert("Max "+MAXD+" players per department");
   sq.push(id);if(sq.length-bn.length>11)bn.push(id);save({squad:sq,bench:bn})}
 function swap(id){if(locked())return alert(END);const bn=[...(me.bench||[])],i=bn.indexOf(id),st=(me.squad||[]).length-bn.length;
-  if(i>=0){if(st>=11)return alert("Starting XI is full. Bench someone first.");bn.splice(i,1);return save({bench:bn})}
-  if(bn.length>=4)return alert("Bench is full (4 subs). Start a sub first.");
+  if(i>=0){if(st>=11)return alert("Starting XI is full. Use Swap with to trade places with a starter.");bn.splice(i,1);return save({bench:bn})}
+  if(bn.length>=4)return alert("Bench is full. Use Swap with to trade places with a sub.");
   bn.push(id);save({bench:bn,cap:me.cap===id?null:me.cap})}
+function swap2(a,b){if(locked())return alert(END);let bn=[...(me.bench||[])];const ia=bn.indexOf(a)>=0,ib=bn.indexOf(b)>=0;if(ia===ib)return;
+  const s=ia?b:a,u=ia?a:b;bn=bn.filter(x=>x!==u);bn.push(s);
+  const st=(me.squad||[]).filter(id=>!bn.includes(id)).map(P).filter(Boolean),c=k=>st.filter(p=>p.pos===k).length,f=c("DEF")+"-"+c("MID")+"-"+c("FWD");
+  const patch={bench:bn,cap:me.cap===s?null:me.cap};if(c("GK")===1&&FORMS.includes(f))patch.form=f;
+  selId=null;save(patch)}
 function cap(id){if(locked())return alert(END);if((me.bench||[]).includes(id))return alert("Captain must be in your starting XI");save({cap:id})}
 function setForm(v){if(locked())return alert(END);save({form:v,...arrange(v,me)})}
 function auto(){if(locked())return alert(END);save(arrange(me.form||"4-4-2",me))}
@@ -145,12 +150,13 @@ function render(force){
   if(tab==="team"){
     if(!me)h+=`<div class="card"><b>Create your team</b><input id="nm" placeholder="Team name" maxlength="24"><select id="dp">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><button class="btn p" onclick="join()">Join league</button></div>`;
     else{const sq=me.squad||[],fm=me.form||"4-4-2",[d,mi,fw]=FM(me);
-      const msg=ok(me)?"✅ Squad complete":sq.length<15?"⚠ Pick "+(15-sq.length)+" more player(s). Incomplete squads score 0.":"⚠ "+fm+" needs 1 GK, "+d+" DEF, "+mi+" MID, "+fw+" FWD in your XI. Tap Auto-set XI.";
+      const msg=ok(me)?"✅ Squad complete":sq.length<15?"⚠ Pick "+(15-sq.length)+" more player(s). Incomplete squads score 0.":"⚠ "+fm+" needs 1 GK, "+d+" DEF, "+mi+" MID, "+fw+" FWD in your XI. Swap players or tap Auto-set XI.";
       h+=`<div class="row"><select onchange="setForm(this.value)">${FORMS.map(x=>`<option ${x===fm?"selected":""}>${x}</option>`).join("")}</select><button class="btn p sm" onclick="auto()">Auto-set XI</button></div><div class="mu">${msg}</div>`;
       h+=shotHTML(me,false);
       const sp=selId&&sq.includes(selId)?P(selId):null;
-      if(sp){const onb=(me.bench||[]).includes(sp.id);h+=`<div class="card"><b>${esc(sp.name)}</b> <span class="mu">${sp.pos} · ${esc(sp.dept)} · £${sp.price}m · ${pp(sp)} pts</span><div class="bt" style="justify-content:flex-start;margin-top:6px">${onb?"":`<button class="btn sm p" onclick="cap('${sp.id}')">Captain</button>`}<button class="btn sm" onclick="swap('${sp.id}')">${onb?"Start":"Bench"}</button><button class="btn sm" onclick="toggle('${sp.id}')">Remove</button><button class="btn sm" onclick="pick(null)">Close</button></div></div>`}
-      else h+=`<div class="mu">Tap a player on the pitch to set captain, bench or remove.</div>`}
+      if(sp){const onb=(me.bench||[]).includes(sp.id),oth=sq.map(P).filter(Boolean).filter(x=>(me.bench||[]).includes(x.id)!==onb);
+        h+=`<div class="card"><b>${esc(sp.name)}</b> <span class="mu">${sp.pos} · ${esc(sp.dept)} · £${sp.price}m · ${pp(sp)} pts</span><div class="bt" style="justify-content:flex-start;margin-top:6px">${onb?"":`<button class="btn sm p" onclick="cap('${sp.id}')">Captain</button>`}<button class="btn sm" onclick="swap('${sp.id}')">${onb?"Start":"Bench"}</button><button class="btn sm" onclick="toggle('${sp.id}')">Remove</button><button class="btn sm" onclick="pick(null)">Close</button></div>${oth.length?`<div class="mu" style="margin-top:8px">Swap with ${onb?"a starter":"a sub"}:</div><div class="bt" style="justify-content:flex-start;margin-top:4px">${oth.map(x=>`<button class="btn sm" onclick="swap2('${sp.id}','${x.id}')">⇄ ${esc(x.name)} (${x.pos})</button>`).join("")}</div>`:""}</div>`}
+      else h+=`<div class="mu">Tap a player on the pitch to set captain, swap or remove.</div>`}
   }
   if(tab==="players"){
     h+=`<div class="row"><select onchange="setFlt(this.value)">${opts(DEPTS,flt)}</select><select onchange="setPos(this.value)">${opts(POS,fpos)}</select></div>`;
@@ -173,6 +179,6 @@ function render(force){
   a.innerHTML=h;
 }
 function setTab(k){tab=k;viewId=null;render(true)}function setFlt(v){flt=v;render(true)}function setPos(v){fpos=v;render(true)}
-Object.assign(window,{join,toggle,swap,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view});
+Object.assign(window,{join,toggle,swap,swap2,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view});
 init();
 </script></body></html>
