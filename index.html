@@ -22,6 +22,22 @@ input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:10p
 .g6{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.g6 input{padding:6px 2px;text-align:center;margin:2px 0}
 .hd{display:flex;gap:10px;align-items:center}.hd img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--ac2)}.dl{border-left:4px solid var(--ac2)}
 .ed{border:1px dashed var(--ac);border-radius:10px;padding:8px;margin:8px 0}
+.av{display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #fff;object-fit:cover;margin:0 auto;color:#fff;font-weight:700;flex:none;background:#fff}
+.av.ghost{background:#ffffff33;border:2px dashed #ffffffaa;font-size:20px}
+.lf{display:flex;align-items:center;gap:10px}
+.shot{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:8px;margin:8px 0}
+.sh{display:flex;align-items:center;gap:10px;padding:2px 4px 8px}.sh img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--ac2)}.big{font-size:26px;line-height:1}
+.pitch{position:relative;background:repeating-linear-gradient(180deg,#2e9e4f 0 12.5%,#35ab59 12.5% 25%);border-radius:12px;padding:10px 2px 6px;overflow:hidden;border:2px solid #ffffff44}
+.pitch::before{content:"";position:absolute;left:50%;top:52%;width:96px;height:96px;border:2px solid #ffffff55;border-radius:50%;transform:translate(-50%,-50%)}
+.pitch::after{content:"";position:absolute;left:25%;top:0;width:50%;height:56px;border:2px solid #ffffff55;border-top:none}
+.pr{display:flex;justify-content:space-around;margin:10px 0;position:relative;z-index:1}
+.pl{position:relative;width:76px;text-align:center;cursor:pointer;border-radius:10px;padding:2px 0}
+.pl.on{outline:2px solid #ffd400;background:#ffffff22}
+.pn{background:#fff;color:#111;font-size:11px;font-weight:700;border-radius:6px 6px 0 0;padding:1px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.pt{background:#0f1b3d;color:#fff;font-size:11px;font-weight:700;border-radius:0 0 6px 6px;padding:1px 3px}
+.cb{position:absolute;top:0;right:8px;background:#111;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:700;line-height:18px;z-index:2}
+.bench{background:linear-gradient(180deg,#2e9e4f,#278a44);border-radius:12px;margin-top:6px;padding:4px 2px 2px}
+.bench .mu{color:#fff;padding:2px 8px}
 </style></head><body>
 <div class="hd"><img alt="BAMSSA" src="IMG_5672.jpeg"><div><h1>Bamssa Fantasy League</h1>
 <div class="sub">Pick 15 players (11 + 4 subs) · choose your formation · £100m · max 3 per department · captain scores double</div></div></div>
@@ -39,7 +55,7 @@ const POS=["GK","DEF","MID","FWD"],QUOTA={GK:2,DEF:5,MID:5,FWD:3};
 const FORMS=["3-4-3","3-5-2","4-3-3","4-4-2","4-5-1","5-3-2","5-4-1"];
 const GV={GK:10,DEF:10,MID:8,FWD:6},CSV={GK:6,DEF:6,MID:2,FWD:0};
 const KEYS=["g","a","cs","ps","motm","ft","ht","pts"],LBL=["G","A","CS","PS","MOTM","FT","HT","±"];
-let db,uid,players=[],mgrs=[],me=null,tab="team",admin=false,flt="All",fpos="All",ready=false,editId=null;
+let db,uid,players=[],mgrs=[],me=null,tab="team",admin=false,flt="All",fpos="All",ready=false,editId=null,aq="",adp="All",afp="All",apmin="",apmax="",asort="name",selId=null;
 const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const P=id=>players.find(p=>p.id===id);
 const pp=p=>(p.g||0)*GV[p.pos]+(p.a||0)*5+(p.cs||0)*CSV[p.pos]+(p.ps||0)*5+(p.motm||0)*5+(p.ft||0)*2+(p.ht||0)+(p.pts||0);
@@ -52,6 +68,12 @@ function arrange(form,m){const[d,mi,f]=form.split("-").map(Number),need={GK:1,DE
   (m.squad||[]).map(P).filter(Boolean).sort((a,b)=>b.price-a.price).forEach(p=>{if(need[p.pos]>0){need[p.pos]--;st.push(p.id)}else bn.push(p.id)});
   return{bench:bn,cap:st.includes(m.cap)?m.cap:null}}
 const bl=()=>{const f=document.activeElement;f&&f.blur&&f.blur()};
+const resizeImg=f=>new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=e=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=160,c=document.createElement("canvas");c.width=c.height=s;const m=Math.min(im.width,im.height);c.getContext("2d").drawImage(im,(im.width-m)/2,(im.height-m)*0.2,m,m,0,0,s,s);res(c.toDataURL("image/jpeg",0.75))};im.src=e.target.result};r.readAsDataURL(f)});
+const dc=d=>`hsl(${((DEPTS.indexOf(d)+1)*43)%360},60%,42%)`;
+const ini=n=>n.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+function av(p,s){const st=`width:${s}px;height:${s}px`;return p.photo?`<img class="av" style="${st}" src="${p.photo}" alt="">`:`<div class="av" style="${st};background:${dc(p.dept)};font-size:${Math.round(s*.36)}px">${esc(ini(p.name))}</div>`}
+const ghost=`<div class="pl"><div class="av ghost" style="width:52px;height:52px">+</div><div class="pn">Empty</div></div>`;
+function pl(p,m){const c=m.cap===p.id;return `<div class="pl ${selId===p.id?"on":""}" onclick="pick('${p.id}')">${c?'<span class="cb">C</span>':""}${av(p,52)}<div class="pn">${esc(p.name)}</div><div class="pt">${pp(p)*(c?2:1)}</div></div>`}
 async function init(){
   try{
     db=getFirestore(initializeApp(firebaseConfig));
@@ -64,7 +86,7 @@ async function init(){
 async function save(patch){try{await setDoc(doc(db,"managers",uid),{...(me||{}),...patch})}catch(e){alert("Could not save, try again.")}}
 function join(){if(locked())return alert(END);const n=$("#nm").value.trim(),d=$("#dp").value;if(!n)return alert("Enter your team name");bl();save({name:n,dept:d,squad:[],bench:[],cap:null,form:"4-4-2"})}
 function toggle(id){if(locked())return alert(END);const sq=[...(me.squad||[])],bn=[...(me.bench||[])],i=sq.indexOf(id);
-  if(i>=0){sq.splice(i,1);return save({squad:sq,bench:bn.filter(x=>x!==id),cap:me.cap===id?null:me.cap})}
+  if(i>=0){if(selId===id)selId=null;sq.splice(i,1);return save({squad:sq,bench:bn.filter(x=>x!==id),cap:me.cap===id?null:me.cap})}
   const p=P(id);if(sq.length>=15)return alert("Squad full (15 players)");
   const ps=sq.map(P).filter(Boolean);
   if(cost(me)+p.price>BUDGET)return alert("Over budget!");
@@ -78,18 +100,32 @@ function swap(id){if(locked())return alert(END);const bn=[...(me.bench||[])],i=b
 function cap(id){if(locked())return alert(END);if((me.bench||[]).includes(id))return alert("Captain must be in your starting XI");save({cap:id})}
 function setForm(v){if(locked())return alert(END);save({form:v,...arrange(v,me)})}
 function auto(){if(locked())return alert(END);save(arrange(me.form||"4-4-2",me))}
+function pick(id){selId=(id===null||selId===id)?null:id;render(true)}
 function pin(){if($("#pn").value===ADMIN_PIN){admin=true;render(true)}else alert("Wrong PIN")}
-async function addP(){const n=$("#an").value.trim(),pr=parseFloat($("#ap").value);if(!n||!(pr>0))return alert("Fill name and price");bl();
-  await addDoc(collection(db,"players"),{name:n,dept:$("#ad").value,pos:$("#apos").value,price:pr,g:0,a:0,cs:0,ps:0,motm:0,ft:0,ht:0,pts:0});$("#an").value=""}
+async function addP(){const n=$("#an").value.trim(),pr=parseFloat($("#ap").value),d=$("#ad").value;if(!n||!(pr>0))return alert("Fill name and price");
+  if(players.some(p=>p.name.trim().toLowerCase()===n.toLowerCase()&&p.dept===d))return alert(n+" already exists in "+d+". Search for them below.");
+  let photo="";const f=$("#aph").files[0];if(f){try{photo=await resizeImg(f)}catch(e){return alert("Could not read that photo")}}
+  bl();await addDoc(collection(db,"players"),{name:n,dept:d,pos:$("#apos").value,price:pr,photo,g:0,a:0,cs:0,ps:0,motm:0,ft:0,ht:0,pts:0});$("#an").value="";$("#aph").value=""}
+async function upPhoto(id,el){const f=el.files[0];if(!f)return;try{const photo=await resizeImg(f);await updateDoc(doc(db,"players",id),{photo})}catch(e){alert("Could not upload photo")}el.value=""}
+async function rmPhoto(id){await updateDoc(doc(db,"players",id),{photo:""})}
 async function saveStats(id){const o={};KEYS.forEach(k=>o[k]=parseFloat($("#"+k+id).value)||0);bl();await updateDoc(doc(db,"players",id),o)}
 function editP(id){editId=id;render(true)}
 function cancelEdit(){editId=null;render(true)}
 async function saveEdit(id){const n=$("#en"+id).value.trim(),pr=parseFloat($("#ep"+id).value);if(!n||!(pr>0))return alert("Fill name and price");bl();
   await updateDoc(doc(db,"players",id),{name:n,dept:$("#ed"+id).value,pos:$("#eps"+id).value,price:pr});editId=null;render(true)}
 async function delP(id){if(confirm("Delete player?"))await deleteDoc(doc(db,"players",id))}
-function pc(p,btn){return `<div class="card row"><div><b>${esc(p.name)}</b> <span class="mu">${p.pos} · ${esc(p.dept)}</span><div class="mu">£${p.price}m · ${p.g||0}G ${p.a||0}A ${p.cs||0}CS ${p.ps||0}PS ${p.motm||0}MOTM ${p.ft||0}FT ${p.ht||0}HT · <span class="pts">${pp(p)} pts</span></div></div>${btn}</div>`}
+function pc(p,btn){return `<div class="card row"><div class="lf">${av(p,40)}<div><b>${esc(p.name)}</b> <span class="mu">${p.pos} · ${esc(p.dept)}</span><div class="mu">£${p.price}m · ${p.g||0}G ${p.a||0}A ${p.cs||0}CS ${p.ps||0}PS ${p.motm||0}MOTM ${p.ft||0}FT ${p.ht||0}HT · <span class="pts">${pp(p)} pts</span></div></div></div>${btn}</div>`}
 function opts(list,sel){return `<option>All</option>`+list.map(d=>`<option ${sel===d?"selected":""}>${d}</option>`).join("")}
 function sel(list,val){return list.map(d=>`<option ${val===d?"selected":""}>${d}</option>`).join("")}
+function adminCard(p){return `<div class="card"><div class="row"><div class="lf">${av(p,40)}<b>${esc(p.name)}</b></div><span class="mu">${p.pos} · ${esc(p.dept)} · £${p.price}m · ${pp(p)} pts</span></div>${editId===p.id?`<div class="ed"><div class="mu">Edit details</div><input id="en${p.id}" value="${esc(p.name)}" placeholder="Name"><select id="ed${p.id}">${sel(DEPTS,p.dept)}</select><select id="eps${p.id}">${sel(POS,p.pos)}</select><input id="ep${p.id}" type="number" step="0.5" value="${p.price}" placeholder="Price (£m)"><div class="row"><button class="btn p sm" onclick="saveEdit('${p.id}')">Save details</button><button class="btn sm" onclick="cancelEdit()">Cancel</button></div></div>`:""}<div class="g6">${KEYS.map((k,i)=>`<label class="mu">${LBL[i]}<input id="${k}${p.id}" type="number" value="${p[k]||0}"></label>`).join("")}</div><div class="row"><button class="btn p sm" onclick="saveStats('${p.id}')">Save stats</button><div class="bt"><label class="btn sm">📷 Photo<input type="file" accept="image/*" style="display:none" onchange="upPhoto('${p.id}',this)"></label>${p.photo?`<button class="btn sm" onclick="rmPhoto('${p.id}')">No photo</button>`:""}<button class="btn sm" onclick="editP('${p.id}')">Edit details</button><button class="btn sm" onclick="delP('${p.id}')">✕ Delete</button></div></div></div>`}
+function adminList(){const q=aq.trim().toLowerCase(),lo=parseFloat(apmin),hi=parseFloat(apmax);
+  const l=players.filter(p=>(adp==="All"||p.dept===adp)&&(afp==="All"||p.pos===afp)&&(!q||p.name.toLowerCase().includes(q))&&(isNaN(lo)||p.price>=lo)&&(isNaN(hi)||p.price<=hi))
+    .sort((a,b)=>asort==="hi"?b.price-a.price:asort==="lo"?a.price-b.price:a.name.localeCompare(b.name));
+  return `<div class="mu">Showing ${l.length} of ${players.length}</div>`+(l.map(adminCard).join("")||'<div class="mu">No players match.</div>')}
+function refresh(){const e=$("#al");if(e)e.innerHTML=adminList()}
+function setAq(v){aq=v;refresh()}function setAdp(v){adp=v;refresh()}function setAf(v){afp=v;refresh()}
+function setAmin(v){apmin=v;refresh()}function setAmax(v){apmax=v;refresh()}function setAs(v){asort=v;refresh()}
+function clearF(){aq="";adp="All";afp="All";apmin="";apmax="";asort="name";render(true)}
 function render(force){
   const a=$("#app");if(!db||!ready)return;
   const f=document.activeElement;if(!force&&f&&f.tagName==="INPUT"&&a.contains(f))return;
@@ -98,12 +134,15 @@ function render(force){
   h+=locked()?'<div class="card dl">🔒 Squad selection has closed</div>':`<div class="card dl">⏳ Squad selection closes 12 Nov 2026 · ${left()}</div>`;
   if(tab==="team"){
     if(!me)h+=`<div class="card"><b>Create your team</b><input id="nm" placeholder="Team name" maxlength="24"><select id="dp">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><button class="btn p" onclick="join()">Join league</button></div>`;
-    else{const sq=me.squad||[],B=(me.bench||[]).map(P).filter(Boolean),S=starters(me).sort((x,y)=>POS.indexOf(x.pos)-POS.indexOf(y.pos)),fm=me.form||"4-4-2",[d,mi,fw]=FM(me);
+    else{const sq=me.squad||[],B=(me.bench||[]).map(P).filter(Boolean),S=starters(me),fm=me.form||"4-4-2",[d,mi,fw]=FM(me);
       const msg=ok(me)?"✅ Squad complete":sq.length<15?"⚠ Pick "+(15-sq.length)+" more player(s). Incomplete squads score 0.":"⚠ "+fm+" needs 1 GK, "+d+" DEF, "+mi+" MID, "+fw+" FWD in your XI. Tap Auto-set XI.";
-      h+=`<div class="card row"><div><b>${esc(me.name)}</b><div class="mu">${esc(me.dept)} · £${(BUDGET-cost(me)).toFixed(1)}m left · ${sq.length}/15</div><div class="mu">${msg}</div></div><div class="pts" style="font-size:22px">${score(me)}</div></div>`;
-      h+=`<div class="row"><select onchange="setForm(this.value)">${FORMS.map(x=>`<option ${x===fm?"selected":""}>${x}</option>`).join("")}</select><button class="btn p sm" onclick="auto()">Auto-set XI</button></div>`;
-      h+=`<div class="mu">STARTING XI · ${fm} (${S.length}/11)</div>`+(S.map(p=>pc(p,`<div class="bt">${me.cap===p.id?'<span class="badge">C</span>':`<button class="btn sm" onclick="cap('${p.id}')">Captain</button>`}<button class="btn sm" onclick="swap('${p.id}')">Bench</button><button class="btn sm" onclick="toggle('${p.id}')">✕</button></div>`)).join("")||'<div class="mu">No players yet. Open the Players tab.</div>');
-      h+=`<div class="mu" style="margin-top:8px">SUBS (${B.length}/4)</div>`+(B.map(p=>pc(p,`<div class="bt"><button class="btn sm" onclick="swap('${p.id}')">Start</button><button class="btn sm" onclick="toggle('${p.id}')">✕</button></div>`)).join("")||'<div class="mu">No subs yet.</div>')}
+      h+=`<div class="row"><select onchange="setForm(this.value)">${FORMS.map(x=>`<option ${x===fm?"selected":""}>${x}</option>`).join("")}</select><button class="btn p sm" onclick="auto()">Auto-set XI</button></div><div class="mu">${msg}</div>`;
+      const rows=[["GK",1],["DEF",d],["MID",mi],["FWD",fw]].map(([k,n])=>{const ps=S.filter(p=>p.pos===k);let x=ps.map(p=>pl(p,me)).join("");for(let i=ps.length;i<n;i++)x+=ghost;return `<div class="pr">${x}</div>`}).join("");
+      let bn=B.map(p=>pl(p,me)).join("");for(let i=B.length;i<4;i++)bn+=ghost;
+      h+=`<div class="shot"><div class="sh"><img src="IMG_5672.jpeg" alt=""><div style="flex:1;min-width:0"><b>${esc(me.name)}</b><div class="mu">${esc(me.dept)} · ${fm} · £${(BUDGET-cost(me)).toFixed(1)}m left · ${sq.length}/15</div></div><div class="pts big">${score(me)}</div></div><div class="pitch">${rows}</div><div class="bench"><div class="mu">SUBS</div><div class="pr">${bn}</div></div></div>`;
+      const sp=selId&&sq.includes(selId)?P(selId):null;
+      if(sp){const onb=(me.bench||[]).includes(sp.id);h+=`<div class="card"><b>${esc(sp.name)}</b> <span class="mu">${sp.pos} · ${esc(sp.dept)} · £${sp.price}m · ${pp(sp)} pts</span><div class="bt" style="justify-content:flex-start;margin-top:6px">${onb?"":`<button class="btn sm p" onclick="cap('${sp.id}')">Captain</button>`}<button class="btn sm" onclick="swap('${sp.id}')">${onb?"Start":"Bench"}</button><button class="btn sm" onclick="toggle('${sp.id}')">Remove</button><button class="btn sm" onclick="pick(null)">Close</button></div></div>`}
+      else h+=`<div class="mu">Tap a player on the pitch to set captain, bench or remove.</div>`}
   }
   if(tab==="players"){
     h+=`<div class="row"><select onchange="setFlt(this.value)">${opts(DEPTS,flt)}</select><select onchange="setPos(this.value)">${opts(POS,fpos)}</select></div>`;
@@ -117,12 +156,12 @@ function render(force){
     h+=`<div class="card"><b>Scoring</b><div class="mu">Goal: GK/DEF 10, MID 8, FWD 6 · Assist 5 · Clean sheet: GK/DEF 6, MID 2 · MOTM 5 · Penalty save 5 · Playing time: full time 2, half time 1 · Captain x2 · Subs do not score</div></div>`}
   if(tab==="admin"){
     if(!admin)h+=`<div class="card"><b>Admin PIN</b><input id="pn" type="password" inputmode="numeric" maxlength="4" placeholder="4-digit PIN"><button class="btn p" onclick="pin()">Unlock</button></div>`;
-    else{h+=`<div class="card"><b>Add player</b><input id="an" placeholder="Player name"><select id="ad">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><select id="apos">${POS.map(d=>`<option>${d}</option>`).join("")}</select><input id="ap" type="number" step="0.5" placeholder="Price (£m)"><button class="btn p" onclick="addP()">Add</button></div><div class="card"><b>Player stats</b><div class="mu">Type each player's TOTALS: G goals, A assists, CS clean sheets, PS penalty saves, MOTM awards, FT full matches played, HT half matches played, ± extra points. Tap Save stats. Use Edit details to change name, department, position or price.</div></div>`;
-      h+=players.map(p=>`<div class="card"><div class="row"><b>${esc(p.name)}</b><span class="mu">${p.pos} · ${esc(p.dept)} · £${p.price}m · ${pp(p)} pts</span></div>${editId===p.id?`<div class="ed"><div class="mu">Edit details</div><input id="en${p.id}" value="${esc(p.name)}" placeholder="Name"><select id="ed${p.id}">${sel(DEPTS,p.dept)}</select><select id="eps${p.id}">${sel(POS,p.pos)}</select><input id="ep${p.id}" type="number" step="0.5" value="${p.price}" placeholder="Price (£m)"><div class="row"><button class="btn p sm" onclick="saveEdit('${p.id}')">Save details</button><button class="btn sm" onclick="cancelEdit()">Cancel</button></div></div>`:""}<div class="g6">${KEYS.map((k,i)=>`<label class="mu">${LBL[i]}<input id="${k}${p.id}" type="number" value="${p[k]||0}"></label>`).join("")}</div><div class="row"><button class="btn p sm" onclick="saveStats('${p.id}')">Save stats</button><div class="bt"><button class="btn sm" onclick="editP('${p.id}')">Edit details</button><button class="btn sm" onclick="delP('${p.id}')">✕ Delete</button></div></div></div>`).join("")}
+    else{h+=`<div class="card"><b>Add player</b><input id="an" placeholder="Player name"><select id="ad">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><select id="apos">${POS.map(d=>`<option>${d}</option>`).join("")}</select><input id="ap" type="number" step="0.5" placeholder="Price (£m)"><div class="mu">Photo (optional)</div><input id="aph" type="file" accept="image/*"><button class="btn p" onclick="addP()">Add</button></div>`;
+      h+=`<div class="card"><b>Find players</b><div class="mu">Search before adding, to avoid double entry. Stats are TOTALS: G goals, A assists, CS clean sheets, PS penalty saves, MOTM awards, FT full matches, HT half matches, ± extra points. Tap Save stats.</div><input placeholder="Search by name" value="${esc(aq)}" oninput="setAq(this.value)"><div class="row"><select onchange="setAdp(this.value)">${opts(DEPTS,adp)}</select><select onchange="setAf(this.value)">${opts(POS,afp)}</select></div><div class="row"><input type="number" step="0.5" placeholder="Min £m" value="${esc(apmin)}" oninput="setAmin(this.value)"><input type="number" step="0.5" placeholder="Max £m" value="${esc(apmax)}" oninput="setAmax(this.value)"></div><div class="row"><select onchange="setAs(this.value)"><option value="name" ${asort==="name"?"selected":""}>Sort: Name A-Z</option><option value="hi" ${asort==="hi"?"selected":""}>Sort: Price high to low</option><option value="lo" ${asort==="lo"?"selected":""}>Sort: Price low to high</option></select><button class="btn sm" onclick="clearF()">Clear filters</button></div></div><div id="al">${adminList()}</div>`}
   }
   a.innerHTML=h;
 }
 function setTab(k){tab=k;render(true)}function setFlt(v){flt=v;render(true)}function setPos(v){fpos=v;render(true)}
-Object.assign(window,{join,toggle,swap,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit});
+Object.assign(window,{join,toggle,swap,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto});
 init();
 </script></body></html>
