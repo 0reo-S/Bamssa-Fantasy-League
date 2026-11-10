@@ -50,17 +50,19 @@ import{getFirestore,collection,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,
 const firebaseConfig={apiKey:"AIzaSyBcns1OW82iioMRzdbBPJ2dOmNyRhVhgcQ",authDomain:"bamssa-fantasy-league.firebaseapp.com",projectId:"bamssa-fantasy-league",storageBucket:"bamssa-fantasy-league.firebasestorage.app",messagingSenderId:"644555872989",appId:"1:644555872989:web:be16b65ca48132983a5934"};
 const ADMIN_PIN="2007",BUDGET=100,MAXD=3,END="Squad selection has ended";
 const REVEAL_BEFORE_DEADLINE=false;
-const DEADLINE="2026-11-10T12:00:00+01:00";
-const DL=new Date(DEADLINE).getTime();
+const DEADLINE="2026-11-10T15:20:00+01:00";
+let DL=new Date(DEADLINE).getTime();
 const locked=()=>Date.now()>DL;
 function left(){let m=Math.max(0,Math.floor((DL-Date.now())/60000)),d=Math.floor(m/1440),h=Math.floor(m%1440/60);return d>0?d+"d "+h+"h left":h+"h "+(m%60)+"m left"}
+const fmtDL=()=>new Date(DL).toLocaleString("en-GB",{timeZone:"Africa/Lagos",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",hour12:true});
+const toWAT=ms=>new Date(ms+3600000).toISOString().slice(0,16);
 const DEPTS=["Pharmacy","Pharmacology","Physiology","MLS","Forensics","Anatomy","Nursing","Biochemistry","Medicine"];
 const MED="Big Sam|MID|5.5;Zebdiel|MID|7;Joel|DEF|5;Tito|GK|5;Kcee|DEF|5.5;Sir Khay|DEF|5.5;Chris|MID|7.5;Osbed|DEF|5;Sola|GK|4.5;Anonymity Heart|FWD|6.5;Femi|MID|8;Jadon|FWD|6.5;Maboa|FWD|8;Nephron|FWD|6;Stein|MID|7;Light|MID|5;Smoke|FWD|6;Oriman|FWD|6;Black|DEF|4.5;Hoodie|DEF|4.5";
 const POS=["GK","DEF","MID","FWD"],QUOTA={GK:2,DEF:5,MID:5,FWD:3};
 const FORMS=["3-4-3","3-5-2","4-3-3","4-4-2","4-5-1","5-3-2","5-4-1"];
 const GV={GK:10,DEF:10,MID:8,FWD:6},CSV={GK:6,DEF:6,MID:2,FWD:0};
 const KEYS=["g","a","cs","ps","motm","ft","ht","pts"],LBL=["G","A","CS","PS","MOTM","FT","HT","±"];
-let db,uid,players=[],mgrs=[],weeks=[],me=null,tab="team",admin=false,flt="All",fpos="All",ready=false,editId=null,aq="",adp="All",afp="All",apmin="",apmax="",asort="name",selId=null,viewId=null,twk=null;
+let db,uid,players=[],mgrs=[],weeks=[],me=null,tab="team",admin=false,flt="All",fpos="All",ready=false,editId=null,aq="",adp="All",afp="All",apmin="",apmax="",asort="name",selId=null,viewId=null,twk=null,swk=null;
 const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const P=id=>players.find(p=>p.id===id);
 const pp=p=>(p.g||0)*GV[p.pos]+(p.a||0)*5+(p.cs||0)*CSV[p.pos]+(p.ps||0)*5+(p.motm||0)*5+(p.ft||0)*2+(p.ht||0)+(p.pts||0);
@@ -82,6 +84,8 @@ function ranking(){const r=[...mgrs].filter(m=>m.name).map(m=>({m,s:score(m)})).
 function prevRanks(){const w=lastW();if(!w||!w.mgr)return null;const e=Object.entries(w.mgr).sort((a,b)=>b[1]-a[1]),o={};let last=null,rk=0;e.forEach(([id,s],i)=>{if(s!==last){rk=i+1;last=s}o[id]=rk});return o}
 function totw(sel){const by=k=>players.filter(p=>p.pos===k).map(p=>({p,w:wp(p,sel)})).sort((a,b)=>b.w-a.w);const G=by("GK"),D=by("DEF"),M=by("MID"),F=by("FWD");let best=null;
   FORMS.forEach(f=>{const[d,mi,fw]=f.split("-").map(Number);if(G.length<1||D.length<d||M.length<mi||F.length<fw)return;const xi=[G[0],...D.slice(0,d),...M.slice(0,mi),...F.slice(0,fw)],t=xi.reduce((s,x)=>s+x.w,0);if(!best||t>best.t)best={f,xi,t}});return best}
+function selCount(){const c={};let n=0;mgrs.filter(m=>m.name).forEach(m=>{n++;(m.squad||[]).forEach(id=>c[id]=(c[id]||0)+1)});return{c,n}}
+function selFor(s){if(s==="live")return selCount();const w=weeks[s];return w&&w.sel?{c:w.sel,n:w.mc||0}:null}
 const bl=()=>{const f=document.activeElement;f&&f.blur&&f.blur()};
 const resizeImg=f=>new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=e=>{const im=new Image();im.onerror=rej;im.onload=()=>{const s=160,c=document.createElement("canvas");c.width=c.height=s;const m=Math.min(im.width,im.height);c.getContext("2d").drawImage(im,(im.width-m)/2,(im.height-m)*0.2,m,m,0,0,s,s);res(c.toDataURL("image/jpeg",0.75))};im.src=e.target.result};r.readAsDataURL(f)});
 const dc=d=>`hsl(${((DEPTS.indexOf(d)+1)*43)%360},60%,42%)`;
@@ -104,6 +108,7 @@ async function init(){
   onSnapshot(collection(db,"players"),s=>{players=s.docs.map(d=>({id:d.id,...d.data()}));ready=true;render()},er);
   onSnapshot(collection(db,"managers"),s=>{mgrs=s.docs.map(d=>({id:d.id,...d.data()}));me=mgrs.find(m=>m.id===uid)||null;ready=true;render()},er);
   onSnapshot(collection(db,"weeks"),s=>{weeks=s.docs.map(d=>d.data()).sort((a,b)=>a.n-b.n);render()},()=>{});
+  onSnapshot(doc(db,"settings","main"),s=>{const d=s.exists()?s.data().deadline:null;if(d){const t=new Date(d).getTime();if(!isNaN(t))DL=t}render()},()=>{});
 }
 async function save(patch){try{await setDoc(doc(db,"managers",uid),{...(me||{}),...patch})}catch(e){alert("Could not save, try again.")}}
 function join(){if(locked())return alert(END);const n=$("#nm").value.trim(),d=$("#dp").value;if(!n)return alert("Enter your team name");bl();save({name:n,dept:d,squad:[],bench:[],cap:null,form:"4-4-2"})}
@@ -137,11 +142,16 @@ async function loadMed(){const l=medList().filter(x=>!players.some(p=>p.id===x.i
   if(!confirm("Add "+l.length+" Medicine players?"))return;const b=writeBatch(db);
   l.forEach(x=>{const{id,...r}=x;b.set(doc(db,"players",id),r)});
   try{await b.commit();alert("Loaded "+l.length+" Medicine players")}catch(e){alert("Could not load, try again.")}}
-async function closeWeek(){const n=weeks.length+1;if(!confirm("Close Week "+n+"? This saves a snapshot of all points so far."))return;
-  const pts={},mgr={};players.forEach(p=>pts[p.id]=pp(p));mgrs.filter(m=>m.name).forEach(m=>mgr[m.id]=score(m));
-  try{await setDoc(doc(db,"weeks","w"+n),{n,pts,mgr});twk=null;alert("Week "+n+" closed")}catch(e){alert("Could not close the week, try again.")}}
-async function delWeek(){const w=lastW();if(!w)return;if(!confirm("Undo the close of Week "+w.n+"?"))return;await deleteDoc(doc(db,"weeks","w"+w.n));twk=null}
+async function closeWeek(){const n=weeks.length+1;if(!confirm("Close Week "+n+"? This saves a snapshot of all points and squad selections so far."))return;
+  const pts={},mgr={},sc=selCount();players.forEach(p=>pts[p.id]=pp(p));mgrs.filter(m=>m.name).forEach(m=>mgr[m.id]=score(m));
+  try{await setDoc(doc(db,"weeks","w"+n),{n,pts,mgr,sel:sc.c,mc:sc.n});twk=null;swk=null;alert("Week "+n+" closed")}catch(e){alert("Could not close the week, try again.")}}
+async function delWeek(){const w=lastW();if(!w)return;if(!confirm("Undo the close of Week "+w.n+"?"))return;await deleteDoc(doc(db,"weeks","w"+w.n));twk=null;swk=null}
 function setTwk(v){twk=v==="live"?"live":parseInt(v);render(true)}
+function setSwk(v){swk=v==="live"?"live":parseInt(v);render(true)}
+async function setDeadline(ms){try{await setDoc(doc(db,"settings","main"),{deadline:new Date(ms).toISOString()},{merge:true});DL=ms;render(true);alert("Squad lock time is now "+fmtDL()+" (Nigeria time)")}catch(e){alert("Could not save the lock time. In Firebase rules, allow read and write on the settings collection.")}}
+function saveDL(){let v=$("#dlin").value;if(!v)return alert("Pick a date and time");if(v.length===16)v+=":00";const t=new Date(v+"+01:00").getTime();if(isNaN(t))return alert("That date is not valid");setDeadline(t)}
+function extDL(min){setDeadline(Math.max(DL,Date.now())+min*60000)}
+function lockNow(){if(confirm("Lock squad selection right now?"))setDeadline(Date.now())}
 async function addP(){const n=$("#an").value.trim(),pr=parseFloat($("#ap").value),d=$("#ad").value;if(!n||!(pr>0))return alert("Fill name and price");
   if(players.some(p=>p.name.trim().toLowerCase()===n.toLowerCase()&&p.dept===d))return alert(n+" already exists in "+d+". Search for them below.");
   let photo="";const f=$("#aph").files[0];if(f){try{photo=await resizeImg(f)}catch(e){return alert("Could not read that photo")}}
@@ -169,9 +179,9 @@ function clearF(){aq="";adp="All";afp="All";apmin="";apmax="";asort="name";rende
 function render(force){
   const a=$("#app");if(!db||!ready)return;
   const f=document.activeElement;if(!force&&f&&f.tagName==="INPUT"&&a.contains(f))return;
-  const tb=[["team","My Team"],["players","Players"],["table","Table"],["totw","Team of Week"],["admin","Admin"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("");
+  const tb=[["team","My Team"],["players","Players"],["table","Table"],["stats","Stats"],["totw","Team of Week"],["admin","Admin"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("");
   let h=`<div class="tabs">${tb}</div>`;
-  h+=locked()?'<div class="card dl">🔒 Squad selection has closed</div>':`<div class="card dl">⏳ Squad selection closes ${new Date(DL).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit",hour12:true})} · ${left()}</div>`;
+  h+=locked()?'<div class="card dl">🔒 Squad selection has closed</div>':`<div class="card dl">⏳ Squad selection closes ${fmtDL()} · ${left()}</div>`;
   if(tab==="team"){
     if(!me)h+=`<div class="card"><b>Create your team</b><input id="nm" placeholder="Team name" maxlength="24"><select id="dp">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><button class="btn p" onclick="join()">Join league</button></div>`;
     else{const sq=me.squad||[],fm=me.form||"4-4-2",[d,mi,fw]=FM(me),rk=ranking(),mine=rk.find(x=>x.m.id===me.id);
@@ -198,6 +208,16 @@ function render(force){
     const d=DEPTS.map(x=>[x,mgrs.filter(m=>m.dept===x).reduce((t,m)=>t+score(m),0),mgrs.filter(m=>m.dept===x).length]).sort((a,b)=>b[1]-a[1]);
     h+=`<div class="card"><b>Department standings</b>`+d.map((x,i)=>`<div class="row"><span>${i+1}. ${x[0]} <span class="mu">${x[2]} mgrs</span></span><span class="pts">${x[1]}</span></div>`).join("")+`</div>`;
     h+=`<div class="card"><b>Scoring</b><div class="mu">Goal: GK/DEF 10, MID 8, FWD 6 · Assist 5 · Clean sheet: GK/DEF 6, MID 2 · MOTM 5 · Penalty save 5 · Playing time: full time 2, half time 1 · Captain x2 · Subs do not score</div></div>`}}
+  if(tab==="stats"){
+    const s=swk===null?(weeks.length?weeks.length-1:"live"):swk,lab=s==="live"?"Live week":"Week "+(weeks[s]?weeks[s].n:"");
+    h+=`<select onchange="setSwk(this.value)">${weeks.map((w,i)=>`<option value="${i}" ${s===i?"selected":""}>Week ${w.n}</option>`).join("")}<option value="live" ${s==="live"?"selected":""}>Live (current week)</option></select>`;
+    const hide=s==="live"&&!locked()&&!admin&&!REVEAL_BEFORE_DEADLINE,sd=hide?null:selFor(s);
+    let top=[];if(sd&&sd.n)top=Object.entries(sd.c).map(([id,c])=>({p:P(id),c})).filter(x=>x.p).sort((a,b)=>b.c-a.c||pp(b.p)-pp(a.p)).slice(0,5);
+    const nm=hide?"Selection stats appear after the squad deadline.":(s!=="live"&&!sd)?"Selections were not recorded for this week.":"No squads yet.";
+    h+=`<div class="card"><b>⭐ Most selected player · ${lab}</b>`+(top.length?top.map((x,i)=>`<div class="row" style="margin-top:6px"><span class="lf" style="gap:8px">${i+1}. ${av(x.p,i?32:44)}<span><b>${esc(x.p.name)}</b><div class="mu">${x.p.pos} · ${esc(x.p.dept)}</div></span></span><span class="pts">${x.c}/${sd.n} · ${Math.round(x.c/sd.n*100)}%</span></div>`).join(""):`<div class="mu">${nm}</div>`)+`</div>`;
+    const tp=players.map(p=>({p,w:wp(p,s)})).filter(x=>x.w>0).sort((a,b)=>b.w-a.w).slice(0,5);
+    h+=`<div class="card"><b>🔥 Highest points · ${lab}</b>`+(tp.length?tp.map((x,i)=>`<div class="row" style="margin-top:6px"><span class="lf" style="gap:8px">${i+1}. ${av(x.p,i?32:44)}<span><b>${esc(x.p.name)}</b><div class="mu">${x.p.pos} · ${esc(x.p.dept)}</div></span></span><span class="pts">+${x.w} pts</span></div>`).join(""):'<div class="mu">No points yet for this week.</div>')+`</div>`;
+  }
   if(tab==="totw"){
     const s=twk===null?(weeks.length?weeks.length-1:"live"):twk;
     h+=`<select onchange="setTwk(this.value)">${weeks.map((w,i)=>`<option value="${i}" ${s===i?"selected":""}>Week ${w.n}</option>`).join("")}<option value="live" ${s==="live"?"selected":""}>Live (current week)</option></select>`;
@@ -211,14 +231,15 @@ function render(force){
   if(tab==="admin"){
     if(!admin)h+=`<div class="card"><b>Admin PIN</b><input id="pn" type="password" inputmode="numeric" maxlength="4" placeholder="4-digit PIN"><button class="btn p" onclick="pin()">Unlock</button></div>`;
     else{const nm=players.filter(p=>p.dept==="Medicine").length;
+      h+=`<div class="card"><b>Squad lock time</b><div class="mu">Now: ${fmtDL()} (Nigeria time) · ${locked()?"🔒 locked":"⏳ "+left()}</div><input id="dlin" type="datetime-local" value="${toWAT(DL)}"><div class="row"><button class="btn p sm" onclick="saveDL()">Save lock time</button><button class="btn sm" onclick="lockNow()">Lock now</button></div><div class="bt" style="justify-content:flex-start;margin-top:6px"><button class="btn sm" onclick="extDL(15)">+15 min</button><button class="btn sm" onclick="extDL(30)">+30 min</button><button class="btn sm" onclick="extDL(60)">+1 hour</button></div><div class="mu" style="margin-top:6px">Times are Nigeria time. Changes apply to everyone straight away.</div></div>`;
       h+=`<div class="card"><b>Medicine squad</b><div class="mu">${nm} Medicine players loaded. Loading again only adds missing players.</div><button class="btn p" onclick="loadMed()">Load Medicine squad</button></div>`;
-      h+=`<div class="card"><b>Gameweeks</b><div class="mu">${weeks.length} closed. Close a week after you finish entering that week's stats. It saves a snapshot for Team of the Week, weekly points and rank movement.</div><div class="row" style="margin-top:6px"><button class="btn p sm" onclick="closeWeek()">Close Week ${weeks.length+1}</button>${weeks.length?`<button class="btn sm" onclick="delWeek()">Undo last close</button>`:""}</div></div>`;
+      h+=`<div class="card"><b>Gameweeks</b><div class="mu">${weeks.length} closed. Close a week after you finish entering that week's stats. It saves a snapshot for Team of the Week, weekly points, rank movement and most selected players.</div><div class="row" style="margin-top:6px"><button class="btn p sm" onclick="closeWeek()">Close Week ${weeks.length+1}</button>${weeks.length?`<button class="btn sm" onclick="delWeek()">Undo last close</button>`:""}</div></div>`;
       h+=`<div class="card"><b>Add player</b><input id="an" placeholder="Player name"><select id="ad">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><select id="apos">${POS.map(d=>`<option>${d}</option>`).join("")}</select><input id="ap" type="number" step="0.5" placeholder="Price (£m)"><div class="mu">Photo (optional)</div><input id="aph" type="file" accept="image/*"><button class="btn p" onclick="addP()">Add</button></div>`;
       h+=`<div class="card"><b>Find players</b><div class="mu">Search before adding, to avoid double entry. Stats are TOTALS: G goals, A assists, CS clean sheets, PS penalty saves, MOTM awards, FT full matches, HT half matches, ± extra points. Tap Save stats.</div><input placeholder="Search by name" value="${esc(aq)}" oninput="setAq(this.value)"><div class="row"><select onchange="setAdp(this.value)">${opts(DEPTS,adp)}</select><select onchange="setAf(this.value)">${opts(POS,afp)}</select></div><div class="row"><input type="number" step="0.5" placeholder="Min £m" value="${esc(apmin)}" oninput="setAmin(this.value)"><input type="number" step="0.5" placeholder="Max £m" value="${esc(apmax)}" oninput="setAmax(this.value)"></div><div class="row"><select onchange="setAs(this.value)"><option value="name" ${asort==="name"?"selected":""}>Sort: Name A-Z</option><option value="hi" ${asort==="hi"?"selected":""}>Sort: Price high to low</option><option value="lo" ${asort==="lo"?"selected":""}>Sort: Price low to high</option></select><button class="btn sm" onclick="clearF()">Clear filters</button></div></div><div id="al">${adminList()}</div>`}
   }
   a.innerHTML=h;
 }
 function setTab(k){tab=k;viewId=null;render(true)}function setFlt(v){flt=v;render(true)}function setPos(v){fpos=v;render(true)}
-Object.assign(window,{join,toggle,swap,swap2,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view,upMgr,closeWeek,delWeek,setTwk,loadMed});
+Object.assign(window,{join,toggle,swap,swap2,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view,upMgr,closeWeek,delWeek,setTwk,setSwk,saveDL,extDL,lockNow,loadMed});
 init();
 </script></body></html>
