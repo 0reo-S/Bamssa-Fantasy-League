@@ -46,15 +46,16 @@ input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:10p
 <div id="app">Loading…</div>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,writeBatch}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyBcns1OW82iioMRzdbBPJ2dOmNyRhVhgcQ",authDomain:"bamssa-fantasy-league.firebaseapp.com",projectId:"bamssa-fantasy-league",storageBucket:"bamssa-fantasy-league.firebasestorage.app",messagingSenderId:"644555872989",appId:"1:644555872989:web:be16b65ca48132983a5934"};
 const ADMIN_PIN="2007",BUDGET=100,MAXD=3,END="Squad selection has ended";
 const REVEAL_BEFORE_DEADLINE=false;
-const DEADLINE="2026-11-09T19:00:00+01:00";
+const DEADLINE="2026-11-10T12:00:00+01:00";
 const DL=new Date(DEADLINE).getTime();
 const locked=()=>Date.now()>DL;
 function left(){let m=Math.max(0,Math.floor((DL-Date.now())/60000)),d=Math.floor(m/1440),h=Math.floor(m%1440/60);return d>0?d+"d "+h+"h left":h+"h "+(m%60)+"m left"}
-const DEPTS=["Pharmacy","Pharmacology","Physiology","MLS","Forensics","Anatomy","Nursing","Biochemistry"];
+const DEPTS=["Pharmacy","Pharmacology","Physiology","MLS","Forensics","Anatomy","Nursing","Biochemistry","Medicine"];
+const MED="Big Sam|MID|5.5;Zebdiel|MID|7;Joel|DEF|5;Tito|GK|5;Kcee|DEF|5.5;Sir Khay|DEF|5.5;Chris|MID|7.5;Osbed|DEF|5;Sola|GK|4.5;Anonymity Heart|FWD|6.5;Femi|MID|8;Jadon|FWD|6.5;Maboa|FWD|8;Nephron|FWD|6;Stein|MID|7;Light|MID|5;Smoke|FWD|6;Oriman|FWD|6;Black|DEF|4.5;Hoodie|DEF|4.5";
 const POS=["GK","DEF","MID","FWD"],QUOTA={GK:2,DEF:5,MID:5,FWD:3};
 const FORMS=["3-4-3","3-5-2","4-3-3","4-4-2","4-5-1","5-3-2","5-4-1"];
 const GV={GK:10,DEF:10,MID:8,FWD:6},CSV={GK:6,DEF:6,MID:2,FWD:0};
@@ -131,6 +132,11 @@ function pick(id){selId=(id===null||selId===id)?null:id;render(true)}
 function view(id){if(id===null){viewId=null;return render(true)}const m=mgrs.find(x=>x.id===id);if(!m)return;
   if(!canSee(m))return alert("Squads are revealed to everyone after the deadline.");viewId=id;render(true);window.scrollTo(0,0)}
 function pin(){if($("#pn").value===ADMIN_PIN){admin=true;render(true)}else alert("Wrong PIN")}
+function medList(){return MED.split(";").map((t,i)=>{const[n,p,pr]=t.split("|");return{id:"medicine-"+i,name:n,dept:"Medicine",pos:p,price:parseFloat(pr),photo:"",g:0,a:0,cs:0,ps:0,motm:0,ft:0,ht:0,pts:0}})}
+async function loadMed(){const l=medList().filter(x=>!players.some(p=>p.id===x.id));if(!l.length)return alert("Medicine squad is already loaded.");
+  if(!confirm("Add "+l.length+" Medicine players?"))return;const b=writeBatch(db);
+  l.forEach(x=>{const{id,...r}=x;b.set(doc(db,"players",id),r)});
+  try{await b.commit();alert("Loaded "+l.length+" Medicine players")}catch(e){alert("Could not load, try again.")}}
 async function closeWeek(){const n=weeks.length+1;if(!confirm("Close Week "+n+"? This saves a snapshot of all points so far."))return;
   const pts={},mgr={};players.forEach(p=>pts[p.id]=pp(p));mgrs.filter(m=>m.name).forEach(m=>mgr[m.id]=score(m));
   try{await setDoc(doc(db,"weeks","w"+n),{n,pts,mgr});twk=null;alert("Week "+n+" closed")}catch(e){alert("Could not close the week, try again.")}}
@@ -204,13 +210,15 @@ function render(force){
   }
   if(tab==="admin"){
     if(!admin)h+=`<div class="card"><b>Admin PIN</b><input id="pn" type="password" inputmode="numeric" maxlength="4" placeholder="4-digit PIN"><button class="btn p" onclick="pin()">Unlock</button></div>`;
-    else{h+=`<div class="card"><b>Gameweeks</b><div class="mu">${weeks.length} closed. Close a week after you finish entering that week's stats. It saves a snapshot for Team of the Week, weekly points and rank movement.</div><div class="row" style="margin-top:6px"><button class="btn p sm" onclick="closeWeek()">Close Week ${weeks.length+1}</button>${weeks.length?`<button class="btn sm" onclick="delWeek()">Undo last close</button>`:""}</div></div>`;
+    else{const nm=players.filter(p=>p.dept==="Medicine").length;
+      h+=`<div class="card"><b>Medicine squad</b><div class="mu">${nm} Medicine players loaded. Loading again only adds missing players.</div><button class="btn p" onclick="loadMed()">Load Medicine squad</button></div>`;
+      h+=`<div class="card"><b>Gameweeks</b><div class="mu">${weeks.length} closed. Close a week after you finish entering that week's stats. It saves a snapshot for Team of the Week, weekly points and rank movement.</div><div class="row" style="margin-top:6px"><button class="btn p sm" onclick="closeWeek()">Close Week ${weeks.length+1}</button>${weeks.length?`<button class="btn sm" onclick="delWeek()">Undo last close</button>`:""}</div></div>`;
       h+=`<div class="card"><b>Add player</b><input id="an" placeholder="Player name"><select id="ad">${DEPTS.map(d=>`<option>${d}</option>`).join("")}</select><select id="apos">${POS.map(d=>`<option>${d}</option>`).join("")}</select><input id="ap" type="number" step="0.5" placeholder="Price (£m)"><div class="mu">Photo (optional)</div><input id="aph" type="file" accept="image/*"><button class="btn p" onclick="addP()">Add</button></div>`;
       h+=`<div class="card"><b>Find players</b><div class="mu">Search before adding, to avoid double entry. Stats are TOTALS: G goals, A assists, CS clean sheets, PS penalty saves, MOTM awards, FT full matches, HT half matches, ± extra points. Tap Save stats.</div><input placeholder="Search by name" value="${esc(aq)}" oninput="setAq(this.value)"><div class="row"><select onchange="setAdp(this.value)">${opts(DEPTS,adp)}</select><select onchange="setAf(this.value)">${opts(POS,afp)}</select></div><div class="row"><input type="number" step="0.5" placeholder="Min £m" value="${esc(apmin)}" oninput="setAmin(this.value)"><input type="number" step="0.5" placeholder="Max £m" value="${esc(apmax)}" oninput="setAmax(this.value)"></div><div class="row"><select onchange="setAs(this.value)"><option value="name" ${asort==="name"?"selected":""}>Sort: Name A-Z</option><option value="hi" ${asort==="hi"?"selected":""}>Sort: Price high to low</option><option value="lo" ${asort==="lo"?"selected":""}>Sort: Price low to high</option></select><button class="btn sm" onclick="clearF()">Clear filters</button></div></div><div id="al">${adminList()}</div>`}
   }
   a.innerHTML=h;
 }
 function setTab(k){tab=k;viewId=null;render(true)}function setFlt(v){flt=v;render(true)}function setPos(v){fpos=v;render(true)}
-Object.assign(window,{join,toggle,swap,swap2,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view,upMgr,closeWeek,delWeek,setTwk});
+Object.assign(window,{join,toggle,swap,swap2,cap,pin,addP,saveStats,delP,setTab,setFlt,setPos,setForm,auto,editP,cancelEdit,saveEdit,setAq,setAdp,setAf,setAmin,setAmax,setAs,clearF,pick,upPhoto,rmPhoto,view,upMgr,closeWeek,delWeek,setTwk,loadMed});
 init();
 </script></body></html>
